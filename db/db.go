@@ -1,20 +1,3 @@
-package db
-
-import "github.com/google/uuid"
-
-var db = make(map[uuid.UUID]*Leaderboard)
-
-type DB struct{}
-
-type Leaderboard struct {
-	ID      uuid.UUID `json:"id"`
-	Name    string    `json:"name"`
-	Columns []string  `json:"columns"`
-	Entries []*Entry  `json:"entries,omitempty"`
-}
-
-type Entry struct{}
-
 /*
 example leaderboard:
 
@@ -30,26 +13,53 @@ how do we represent a leaderboard and a leaderboard entry
 such that columns and it's values are parameters
 */
 
-func NewLeaderboardDB() *DB {
-	return &DB{}
+package db
+
+import "github.com/google/uuid"
+
+type DB interface {
+	// Leaderboard operations.
+	CreateLeaderboard(name string, columns []string) *Leaderboard
+	ReadLeaderboard(id uuid.UUID) *Leaderboard
+	// Entry operations.
+	CreateEntry(leaderboardId uuid.UUID, name string, fieldValues map[string]int) (*Entry, error)
 }
 
-func NewLeaderboard(name string, columns []string) *Leaderboard {
+type Leaderboard struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	FieldNames []string  `json:"fieldNames"`
+	Entries    []*Entry  `json:"entries,omitempty"`
+}
+
+type Entry struct {
+	ID          uuid.UUID      `json:"id"`
+	Name        string         `json:"name"`
+	FieldValues map[string]int `json:"fieldValues"`
+}
+
+func NewLeaderboard(name string, fieldNames []string) *Leaderboard {
 	return &Leaderboard{
-		ID:      uuid.New(),
-		Name:    name,
-		Columns: columns,
+		ID:         uuid.New(),
+		Name:       name,
+		FieldNames: fieldNames,
 	}
 }
 
-func (l *DB) CreateLeaderboard(name string, columns []string) *Leaderboard {
-	leaderboard := NewLeaderboard(name, columns)
-
-	db[leaderboard.ID] = leaderboard
-
-	return leaderboard
+func NewEntry(name string, fieldValues map[string]int) *Entry {
+	return &Entry{
+		ID:          uuid.New(),
+		Name:        name,
+		FieldValues: fieldValues,
+	}
 }
 
-func (l *DB) ReadLeaderboard(id uuid.UUID) *Leaderboard {
-	return db[id]
+func (l *Leaderboard) HasFieldName(name string) bool {
+	for _, fname := range l.FieldNames {
+		if fname == name {
+			return true
+		}
+	}
+
+	return false
 }

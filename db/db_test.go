@@ -1,8 +1,8 @@
 package db
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func TestNewLeaderboard(t *testing.T) {
@@ -12,9 +12,9 @@ func TestNewLeaderboard(t *testing.T) {
 	leaderboard := NewLeaderboard(name, columns)
 
 	expectedLeaderboard := &Leaderboard{
-		ID:      leaderboard.ID,
-		Name:    name,
-		Columns: columns,
+		ID:         leaderboard.ID,
+		Name:       name,
+		FieldNames: columns,
 	}
 
 	if !reflect.DeepEqual(leaderboard, expectedLeaderboard) {

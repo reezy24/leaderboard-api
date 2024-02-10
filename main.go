@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,8 +10,7 @@ import (
 	"github.com/reezy24/leaderboard-api/db"
 )
 
-
-func setupRouter(database *db.DB) *gin.Engine {
+func setupRouter(database db.DB) *gin.Engine {
 	r := gin.Default()
 
 	// Ping test
@@ -18,20 +18,9 @@ func setupRouter(database *db.DB) *gin.Engine {
 		c.String(http.StatusOK, "pong")
 	})
 
-	// Get user value
-	// r.GET("/user/:name", func(c *gin.Context) {
-	// 	user := c.Params.ByName("name")
-	// 	value, ok := db[user]
-	// 	if ok {
-	// 		c.JSON(http.StatusOK, gin.H{"user": user, "value": value})
-	// 	} else {
-	// 		c.JSON(http.StatusOK, gin.H{"user": user, "status": "no value"})
-	// 	}
-	// })
-
 	// Create leaderboard.
-	r.POST("/leaderboard", func(ctx *gin.Context) {
-		var body db.Leaderboard		
+	r.POST("/leaderboards", func(ctx *gin.Context) {
+		var body db.Leaderboard
 
 		if err := ctx.BindJSON(&body); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid request body")
@@ -43,22 +32,27 @@ func setupRouter(database *db.DB) *gin.Engine {
 			return
 		}
 
-		leaderboard := database.CreateLeaderboard(body.Name, body.Columns)
+		if len(body.FieldNames) == 0 {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "at least one field name is required")
+			return
+		}
+	
+		leaderboard := database.CreateLeaderboard(body.Name, body.FieldNames)
 
 		ctx.JSON(http.StatusCreated, leaderboard)
 	})
 
 	// Read leaderboard.
-	r.GET("/leaderboard/:id", func(ctx *gin.Context) {
+	r.GET("/leaderboards/:id", func(ctx *gin.Context) {
 		id := ctx.Params.ByName("id")
 
-		parsedID, err := uuid.Parse(id)
+		parsedId, err := uuid.Parse(id)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid id")
 			return
 		}
 
-		leaderboard := database.ReadLeaderboard(parsedID)
+		leaderboard := database.ReadLeaderboard(parsedId)
 
 		if leaderboard == nil {
 			ctx.AbortWithStatusJSON(http.StatusNotFound, "leaderboard not found")
@@ -68,11 +62,61 @@ func setupRouter(database *db.DB) *gin.Engine {
 		ctx.JSON(http.StatusOK, leaderboard)
 	})
 
+	// Create leaderboard entry.
+	r.POST("/leaderboards/:id/entries", func(ctx *gin.Context) {
+		id := ctx.Params.ByName("id")
+
+		parsedId, err := uuid.Parse(id)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid id")
+			return
+		}
+
+		var body db.Entry
+
+		if err := ctx.BindJSON(&body); err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid request body")
+			return
+		}
+
+		if body.Name == "" {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "name is required")
+			return
+		}
+
+		entry, err := database.CreateEntry(parsedId, body.Name, body.FieldValues)	
+		if err != nil {
+			code := http.StatusInternalServerError
+			msg := "failed to create entry: %s"
+
+			switch err {
+			case db.ErrLeaderboardInvalidFieldName:
+				code = http.StatusBadRequest
+				msg = fmt.Sprintf(msg, "invalid field name")
+			case db.ErrLeaderboardNotFound:
+				code = http.StatusNotFound
+				msg = fmt.Sprintf(msg, "leaderboard not found")
+			default:
+				msg = fmt.Sprintf(msg, err)
+			}
+
+			ctx.AbortWithStatusJSON(code, msg)
+			return
+		}
+
+		ctx.JSON(http.StatusOK, entry)
+	})
+
+	// Update leaderboard entries.
+	r.PATCH("/leaderboards/:lid/entries/:eid", func(ctx *gin.Context) {
+
+	})
+
 	return r
 }
 
 func main() {
-	database := db.NewLeaderboardDB()
+	database := db.NewMemDB()
 	r := setupRouter(database)
 
 	r.Run("localhost:8080")
