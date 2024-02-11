@@ -24,6 +24,7 @@ type DB interface {
 	// Entry operations.
 	CreateEntry(leaderboardId uuid.UUID, name string, fieldValues map[string]int) (*Entry, error)
 	UpdateEntry(leaderboardId uuid.UUID, entryId uuid.UUID, fieldValues map[string]int) (*Entry, error)
+	ReadEntries(leaderboardId uuid.UUID, sortKey, order string) ([]*Entry, error)
 }
 
 type Leaderboard struct {

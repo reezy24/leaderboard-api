@@ -158,10 +158,53 @@ func setupRouter(database db.DB) *gin.Engine {
 
 			ctx.AbortWithStatusJSON(code, msg)
 			return
-
 		}
 
 		ctx.JSON(http.StatusOK, entry)
+	})
+
+	// Read entries (this is the "leaderboard" view).
+	r.GET("/leaderboards/:id/entries", func(ctx *gin.Context) {
+		id := ctx.Params.ByName("id")
+
+		parsedId, err := uuid.Parse(id)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid id")
+			return
+		}
+
+		order := ctx.Query("order")
+		if order != "" && order != "asc" && order != "dsc" {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "order must be \"asc\" or \"dsc\"")
+			return
+		}
+
+		sortKey := ctx.Query("sort_key")
+
+		entries, err := database.ReadEntries(parsedId, sortKey, order)
+		if err != nil {
+			code := http.StatusInternalServerError
+			msg := "failed to read entries: %s"
+
+			switch err {
+			case db.ErrLeaderboardNotFound:
+				code = http.StatusNotFound
+				msg = fmt.Sprintf(msg, "leaderboard not found")
+			case db.ErrLeaderboardHasNoEntries:
+				code = http.StatusNotFound
+				msg = fmt.Sprintf(msg, "leaderboard has no entries")
+			case db.ErrEntryInvalidSortKey:
+				code = http.StatusBadRequest
+				msg = fmt.Sprintf(msg, "sort_key must be a valid field name")
+			default:
+				msg = fmt.Sprintf(msg, err)
+			}
+
+			ctx.AbortWithStatusJSON(code, msg)
+			return
+		}
+
+		ctx.JSON(http.StatusOK, entries)
 	})
 
 	return r

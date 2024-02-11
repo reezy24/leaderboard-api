@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/google/uuid"
 )
@@ -9,7 +10,9 @@ import (
 var (
 	ErrLeaderboardNotFound = errors.New("leaderboard not found")
 	ErrLeaderboardInvalidFieldName = errors.New("invalid field name")
+	ErrLeaderboardHasNoEntries = errors.New("leaderboard has no entries")
 	ErrEntryNotFound = errors.New("entry not found")
+	ErrEntryInvalidSortKey = errors.New("invalid sort key")
 )
 
 var db = make(map[uuid.UUID]*Leaderboard)
@@ -96,4 +99,38 @@ func (d *MemDB) UpdateEntry(
 	}
 
 	return entry, nil
+}
+
+func (d *MemDB) ReadEntries(leaderboardId uuid.UUID, sortKey, order string) ([]*Entry, error) {
+	leaderboard := d.ReadLeaderboard(leaderboardId)
+	if leaderboard == nil {
+		return nil, ErrLeaderboardNotFound
+	}
+
+	if len(leaderboard.Entries) == 0 {
+		return nil, ErrLeaderboardHasNoEntries
+	}
+
+	if sortKey != "" && !leaderboard.HasFieldName(sortKey) {
+		return nil, ErrEntryInvalidSortKey
+	}
+
+	sk := sortKey
+	if sk == "" {
+		sk = leaderboard.FieldNames[0]
+	}
+
+	entries := []*Entry{}
+	for _, entry := range leaderboard.Entries {
+		entries = append(entries, entry)
+	}
+
+	slices.SortStableFunc[[]*Entry](entries, func(a, b *Entry) int {
+		if order == "asc" {
+			return a.FieldNamesToValues[sk] - b.FieldNamesToValues[sk]
+		}
+		return b.FieldNamesToValues[sk] - a.FieldNamesToValues[sk]
+	})
+
+	return entries, nil
 }
