@@ -9,7 +9,7 @@ func TestNewLeaderboard(t *testing.T) {
 	name := "Example Leaderboard"
 	columns := []string{"Column1", "Column2"}
 
-	leaderboard := NewLeaderboard(name, columns)
+	leaderboard := NewLeaderboard(name, columns, nil)
 
 	expectedLeaderboard := &Leaderboard{
 		ID:         leaderboard.ID,

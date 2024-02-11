@@ -19,38 +19,40 @@ import "github.com/google/uuid"
 
 type DB interface {
 	// Leaderboard operations.
-	CreateLeaderboard(name string, columns []string) *Leaderboard
+	CreateLeaderboard(name string, fieldNames []string, entries map[uuid.UUID]*Entry) *Leaderboard
 	ReadLeaderboard(id uuid.UUID) *Leaderboard
 	// Entry operations.
 	CreateEntry(leaderboardId uuid.UUID, name string, fieldValues map[string]int) (*Entry, error)
+	UpdateEntry(leaderboardId uuid.UUID, entryId uuid.UUID, fieldValues map[string]int) (*Entry, error)
 }
 
 type Leaderboard struct {
-	ID         uuid.UUID `json:"id"`
-	Name       string    `json:"name"`
-	FieldNames []string  `json:"fieldNames"`
-	Entries    []*Entry  `json:"entries,omitempty"`
+	ID         uuid.UUID            `json:"id"`
+	Name       string               `json:"name"`
+	FieldNames []string             `json:"fieldNames"`
+	Entries    map[uuid.UUID]*Entry `json:"entries,omitempty"`
 }
 
 type Entry struct {
-	ID          uuid.UUID      `json:"id"`
-	Name        string         `json:"name"`
-	FieldValues map[string]int `json:"fieldValues"`
+	ID                 uuid.UUID      `json:"id"`
+	Name               string         `json:"name"`
+	FieldNamesToValues map[string]int `json:"fieldNamesToValues"`
 }
 
-func NewLeaderboard(name string, fieldNames []string) *Leaderboard {
+func NewLeaderboard(name string, fieldNames []string, entries map[uuid.UUID]*Entry) *Leaderboard {
 	return &Leaderboard{
 		ID:         uuid.New(),
 		Name:       name,
 		FieldNames: fieldNames,
+		Entries:    entries,
 	}
 }
 
 func NewEntry(name string, fieldValues map[string]int) *Entry {
 	return &Entry{
-		ID:          uuid.New(),
-		Name:        name,
-		FieldValues: fieldValues,
+		ID:                 uuid.New(),
+		Name:               name,
+		FieldNamesToValues: fieldValues,
 	}
 }
 

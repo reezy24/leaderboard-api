@@ -36,8 +36,8 @@ func setupRouter(database db.DB) *gin.Engine {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, "at least one field name is required")
 			return
 		}
-	
-		leaderboard := database.CreateLeaderboard(body.Name, body.FieldNames)
+
+		leaderboard := database.CreateLeaderboard(body.Name, body.FieldNames, body.Entries)
 
 		ctx.JSON(http.StatusCreated, leaderboard)
 	})
@@ -84,7 +84,7 @@ func setupRouter(database db.DB) *gin.Engine {
 			return
 		}
 
-		entry, err := database.CreateEntry(parsedId, body.Name, body.FieldValues)	
+		entry, err := database.CreateEntry(parsedId, body.Name, body.FieldNamesToValues)
 		if err != nil {
 			code := http.StatusInternalServerError
 			msg := "failed to create entry: %s"
@@ -109,7 +109,59 @@ func setupRouter(database db.DB) *gin.Engine {
 
 	// Update leaderboard entries.
 	r.PATCH("/leaderboards/:lid/entries/:eid", func(ctx *gin.Context) {
+		lid := ctx.Params.ByName("lid")
 
+		leaderboardId, err := uuid.Parse(lid)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid id")
+			return
+		}
+
+		eid := ctx.Params.ByName("eid")
+
+		entryId, err := uuid.Parse(eid)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid id")
+			return
+		}
+
+		var body db.Entry
+
+		if err := ctx.BindJSON(&body); err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "invalid request body")
+			return
+		}
+
+		if len(body.FieldNamesToValues) == 0 {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, "specify at least one field to update")
+			return
+		}
+	
+		entry, err := database.UpdateEntry(leaderboardId, entryId, body.FieldNamesToValues)
+		if err != nil {
+			code := http.StatusInternalServerError
+			msg := "failed to create entry: %s"
+
+			switch err {
+			case db.ErrLeaderboardInvalidFieldName:
+				code = http.StatusBadRequest
+				msg = fmt.Sprintf(msg, "invalid field name")
+			case db.ErrLeaderboardNotFound:
+				code = http.StatusNotFound
+				msg = fmt.Sprintf(msg, "leaderboard not found")
+			case db.ErrEntryNotFound:
+				code = http.StatusNotFound
+				msg = fmt.Sprintf(msg, "entry not found")
+			default:
+				msg = fmt.Sprintf(msg, err)
+			}
+
+			ctx.AbortWithStatusJSON(code, msg)
+			return
+
+		}
+
+		ctx.JSON(http.StatusOK, entry)
 	})
 
 	return r
